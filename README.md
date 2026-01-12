@@ -71,4 +71,4 @@ This library is open source and free for all. Pull requests are welcome! Please 
 
 ## License
 
-Released under the [MIT License](https://github.com/MuratOzc/PolyCurve/blob/master/LICENSE.txt). Feel free to use it for personal or commercial projects.
+Released under the [MIT License](https://github.com/Katman-Software/PolyCurve/blob/master/LICENSE.txt). Feel free to use it for personal or commercial projects.
