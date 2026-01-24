@@ -864,6 +864,48 @@ namespace PolyCurve
             return new Curve(newCoeffs, XMin, XMax);
         }
 
+        /// <summary>
+        /// Creates a new Curve scaled horizontally by the specified factor.
+        /// Values > 1 stretch the curve, while values between 0 and 1 compress it.
+        /// Negative values reflect the curve across the Y-axis.
+        /// </summary>
+        /// <param name="scaleFactor">The horizontal scaling factor.</param>
+        /// <returns>A new Curve object with adjusted coefficients and domain.</returns>
+        public Curve ScaleHorizontally(double scaleFactor)
+        {
+            if (Math.Abs(scaleFactor) < 1e-10)
+                throw new ArgumentException("Scale factor cannot be zero.");
+
+            double[] newCoeffs = new double[PolynomialCoeffs.Length];
+            for (int i = 0; i < PolynomialCoeffs.Length; i++)
+            {
+                // Each coefficient a_i is adjusted by the power of the scale factor
+                newCoeffs[i] = PolynomialCoeffs[i] / Math.Pow(scaleFactor, i);
+            }
+
+            // Calculate new bounds and ensure XMin < XMax even with negative scaling
+            double b1 = XMin * scaleFactor;
+            double b2 = XMax * scaleFactor;
+
+            return new Curve(newCoeffs, Math.Min(b1, b2), Math.Max(b1, b2));
+        }
+
+        /// <summary>
+        /// Scales the curve vertically by the specified factor.
+        /// Values > 1 stretch the curve, while values between 0 and 1 compress it.
+        /// Negative values flip the curve upside down (reflection across the X-axis).
+        /// </summary>
+        /// <param name="scaleFactor">The vertical scaling factor.</param>
+        /// <returns>A new Curve object with scaled coefficients.</returns>
+        public Curve ScaleVertically(double scaleFactor)
+        {
+            // Vertical scaling multiplies every coefficient by the factor
+            var newCoeffs = PolynomialCoeffs.Select(c => c * scaleFactor).ToArray();
+
+            // Domain (XMin/XMax) remains unchanged for vertical scaling
+            return new Curve(newCoeffs, XMin, XMax);
+        }
+
         #endregion
 
         #region Curve Interactions
@@ -1356,8 +1398,7 @@ namespace PolyCurve
         /// <returns>A new Curve scaled by the specified factor.</returns>
         public static Curve operator *(Curve curve, double scalar)
         {
-            var newCoeffs = curve.PolynomialCoeffs.Select(c => c * scalar).ToArray();
-            return new Curve(newCoeffs, curve.XMin, curve.XMax);
+            return curve.ScaleVertically(scalar);
         }
 
         /// <summary>

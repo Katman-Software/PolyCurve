@@ -994,6 +994,91 @@ public void TestSplitCurve_AtSpecificPoints()
             });
         }
 
+        [Test]
+        public void TestScaleVertically()
+        {
+            // Original: y = x^2 - 4 on [-3, 3]
+            var scaled = testCurve.ScaleVertically(2.0);
+
+            Assert.Multiple(() =>
+            {
+                // Domain should be unchanged
+                Assert.That(scaled.XMin, Is.EqualTo(testCurve.XMin), "Vertical scale should not change XMin");
+                Assert.That(scaled.XMax, Is.EqualTo(testCurve.XMax), "Vertical scale should not change XMax");
+
+                // Y-values should be doubled
+                // At x=0, y was -4, now should be -8
+                Assert.That(scaled.EvaluateAt(0).Y, Is.EqualTo(-8.0).Within(HighPrecisionTolerance));
+
+                // At x=2, y was 0 (root), should still be 0
+                Assert.That(scaled.EvaluateAt(2).Y, Is.EqualTo(0.0).Within(HighPrecisionTolerance));
+
+                // Coefficients should all be doubled
+                double[] expectedCoeffs = { -8, 0, 2 };
+                AssertArraysEqual(scaled.PolynomialCoeffs, expectedCoeffs);
+            });
+        }
+
+        [Test]
+        public void TestScaleHorizontally_Stretch()
+        {
+            // Original: y = x^2 - 4 on [-3, 3] (Roots at -2 and 2)
+            // Stretch by 2.0: Should move roots to -4 and 4
+            var stretched = testCurve.ScaleHorizontally(2.0);
+
+            Assert.Multiple(() =>
+            {
+                // Domain should be doubled
+                Assert.That(stretched.XMin, Is.EqualTo(-6.0).Within(HighPrecisionTolerance));
+                Assert.That(stretched.XMax, Is.EqualTo(6.0).Within(HighPrecisionTolerance));
+
+                // Check new root positions
+                Assert.That(stretched.EvaluateAt(4).Y, Is.EqualTo(0.0).Within(HighPrecisionTolerance), "Root should move from 2 to 4");
+                Assert.That(stretched.EvaluateAt(-4).Y, Is.EqualTo(0.0).Within(HighPrecisionTolerance), "Root should move from -2 to -4");
+
+                // Original peak at x=0, y=-4 should still be at x=0, y=-4
+                Assert.That(stretched.EvaluateAt(0).Y, Is.EqualTo(-4.0).Within(HighPrecisionTolerance));
+            });
+        }
+
+        [Test]
+        public void TestScaleHorizontally_NegativeReflection()
+        {
+            // Create asymmetric curve: y = x + 2 on [0, 5] (X-intercept at -2, outside domain)
+            var asymmetric = new Curve(new double[] { 2, 1 }, 0, 5);
+
+            // Scale by -1 (Reflection across Y-axis)
+            var reflected = asymmetric.ScaleHorizontally(-1.0);
+
+            Assert.Multiple(() =>
+            {
+                // Domain [0, 5] becomes [-5, 0]
+                Assert.That(reflected.XMin, Is.EqualTo(-5.0).Within(HighPrecisionTolerance));
+                Assert.That(reflected.XMax, Is.EqualTo(0.0).Within(HighPrecisionTolerance));
+
+                // Value at x=1 was y=3. Now at x=-1, y should be 3.
+                Assert.That(reflected.EvaluateAt(-1).Y, Is.EqualTo(3.0).Within(HighPrecisionTolerance));
+
+                // Value at x=5 was y=7. Now at x=-5, y should be 7.
+                Assert.That(reflected.EvaluateAt(-5).Y, Is.EqualTo(7.0).Within(HighPrecisionTolerance));
+            });
+        }
+
+        [Test]
+        public void TestScaling_ErrorHandling()
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.Throws<ArgumentException>(() => testCurve.ScaleHorizontally(0),
+                    "Should throw when horizontal scale is zero");
+
+                // Vertical scale by zero is mathematically valid (results in zero-line), 
+                // but usually worth checking behavior
+                var zeroScaled = testCurve.ScaleVertically(0);
+                Assert.That(zeroScaled.EvaluateAt(2).Y, Is.EqualTo(0));
+            });
+        }
+
         #endregion
 
         #region Curve Interactions Tests
