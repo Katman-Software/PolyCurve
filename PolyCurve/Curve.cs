@@ -1458,46 +1458,37 @@ namespace PolyCurve
         #region String Representation
 
         /// <summary>
-        /// Returns a string representation of the polynomial curve in mathematical notation.
-        /// Shows the polynomial equation with coefficients and the domain range.
+        /// Returns a LaTeX string representation of the polynomial curve optimized for Desmos.
+        /// Converts scientific notation (E) to LaTeX powers of 10 and enforces a uniform x^{i} structure.
         /// </summary>
-        /// <returns>A string showing the polynomial equation and its domain, e.g., "2 + 3x^1 - x^2 from 0 to 10".</returns>
-        /// <example>
-        /// <code>
-        /// Console.WriteLine(curve.ToString());
-        /// // Output: "1.5 + 2.3x^1 - 0.8x^2 from -5 to 5"
-        /// </code>
-        /// </example>
+        /// <returns>A Desmos-compatible LaTeX string: e.g., "1.2x^{0}-3.4 \cdot 10^{-5}x^{1}\left\{min\le x\le max\right\}"</returns>
         public override string ToString()
         {
             var terms = new List<string>();
+            bool isFirstTerm = true;
 
             for (int i = 0; i < PolynomialCoeffs.Length; i++)
             {
                 double coeff = PolynomialCoeffs[i];
+                if (Math.Abs(coeff) < 1e-25) continue;
 
-                if (i == 0)
+                string coeffStr = Math.Abs(coeff).ToString("G17");
+
+                if (coeffStr.Contains("E"))
                 {
-                    // First term - no leading sign
-                    terms.Add($"{coeff}x^{i}");
+                    coeffStr = coeffStr.Replace("E-0", "E-").Replace("E+0", "E+").Replace("E+", "E");
+                    coeffStr = coeffStr.Replace("E", @" \cdot 10^{") + "}";
                 }
-                else
-                {
-                    // Subsequent terms - include sign
-                    if (coeff >= 0)
-                    {
-                        terms.Add($"+ {coeff}x^{i}");
-                    }
-                    else
-                    {
-                        // Negative coefficient already has minus sign
-                        terms.Add($"- {Math.Abs(coeff)}x^{i}");
-                    }
-                }
+
+                string prefix = isFirstTerm
+            ? (coeff < 0 ? "-" : "")
+            : (coeff > 0 ? "+" : "-");
+
+                isFirstTerm = false;
+                terms.Add($"{prefix}{coeffStr}x^{{{i}}}");
             }
 
-            string polynomial = string.Join(" ", terms);
-            return $"{polynomial} from {XMin} to {XMax}";
+            return $"{string.Join("", terms)}\\left\\{{{XMin}\\le x\\le {XMax}\\right\\}}";
         }
 
         #endregion

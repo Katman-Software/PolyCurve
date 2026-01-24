@@ -1468,30 +1468,34 @@ public void TestSplitCurve_AtSpecificPoints()
         [Test]
         public void TestToString()
         {
+            // Note: The new logic skips 0 coefficients (0x^2 is gone) 
+            // and uses \left\{ \right\} for domain.
             var curve = new Curve(new double[] { 1, -2, 0, -4 }, 0, 5);
-            string expected = "1x^0 - 2x^1 + 0x^2 - 4x^3 from 0 to 5";
+            string expected = @"1x^{0}-2x^{1}-4x^{3}\left\{0\le x\le 5\right\}";
+
             Assert.That(curve.ToString(), Is.EqualTo(expected));
         }
 
         [Test]
-        public void TestToString_EdgeCases()
+        public void TestToString_DesmosLaTeX()
         {
             Assert.Multiple(() =>
             {
-                // Constant curve
-                var constant = new Curve(new double[] { 42 }, -1, 1);
-                Assert.That(constant.ToString(), Does.Contain("42"), "Constant curve string representation");
+                // Test 1: Scientific notation and skip zero
+                var curve = new Curve(new double[] { 1, 0, 3.29e-6 }, 2500, 4800);
+                string result = curve.ToString();
 
-                // Linear curve
-                var linear = new Curve(new double[] { 0, 1 }, 0, 10);
-                Assert.That(linear.ToString(), Does.Contain("1x^1"), "Linear curve string representation");
+                // Should produce: 1x^{0}+3.29 \cdot 10^{-6}x^{2}\left\{2500\le x\le 4800\right\}
+                Assert.That(result, Does.Contain(@"\cdot 10^{-6}"), "Scientific notation conversion");
+                Assert.That(result, Does.Not.Contain("x^{1}"), "Skipping zero coefficients");
+                Assert.That(result, Does.StartWith("1x^{0}"), "First term sign handling");
 
-                // Negative coefficient handling
-                var negative = new Curve(new double[] { -5, 3, -2 }, 0, 1);
-                string negStr = negative.ToString();
-                Assert.That(negStr, Does.Contain("-5"), "Negative constant term");
-                Assert.That(negStr, Does.Contain("+ 3"), "Positive linear term");
-                Assert.That(negStr, Does.Contain("- 2"), "Negative quadratic term");
+                // Test 2: Leading negative
+                var negative = new Curve(new double[] { -5, 1 }, 0, 10);
+                Assert.That(negative.ToString(), Does.StartWith("-5x^{0}"), "Leading negative sign");
+
+                // Test 3: Desmos Braces
+                Assert.That(negative.ToString(), Does.Contain(@"\left\{"), "Escaped LaTeX braces for Desmos");
             });
         }
 
