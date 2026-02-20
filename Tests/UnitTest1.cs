@@ -1657,6 +1657,112 @@ public void TestSplitCurve_AtSpecificPoints()
         }
 
         [Test]
+        public void TestCurveMultiplication()
+        {
+            // (1 + 2x) * (3 + 4x) = 3 + 10x + 8x^2
+            var curve1 = new Curve(new double[] { 1, 2 }, 0, 5);
+            var curve2 = new Curve(new double[] { 3, 4 }, 0, 5);
+            
+            var product = curve1 * curve2;
+            
+            double[] expectedCoeffs = { 3, 10, 8 };
+            AssertArraysEqual(expectedCoeffs, product.PolynomialCoeffs);
+            Assert.That(product.PolynomialDegree, Is.EqualTo(2));
+            
+            // Check points
+            Assert.That(product.EvaluateAt(0).Y, Is.EqualTo(3).Within(1e-10));
+            Assert.That(product.EvaluateAt(1).Y, Is.EqualTo(3 * 7).Within(1e-10)); // (1+2)*(3+4) = 3*7 = 21
+            
+            // Test overlapping domain
+            var curve3 = new Curve(new double[] { 1 }, 2, 8); // f(x) = 1, domain [2, 8]
+            var curve4 = new Curve(new double[] { 2 }, 0, 4); // f(x) = 2, domain [0, 4]
+            
+            var overlappedProduct = curve3 * curve4;
+            Assert.That(overlappedProduct.XMin, Is.EqualTo(2));
+            Assert.That(overlappedProduct.XMax, Is.EqualTo(4));
+            Assert.That(overlappedProduct.PolynomialCoeffs[0], Is.EqualTo(2));
+        }
+
+        [Test]
+        public void TestCurveMultiplication_NoOverlap()
+        {
+            var curve1 = new Curve(new double[] { 1 }, 0, 2);
+            var curve2 = new Curve(new double[] { 1 }, 3, 5);
+            
+            Assert.Throws<ArgumentException>(() => { var product = curve1 * curve2; });
+        }
+
+        [Test]
+        public void TestMultiplyAndFit()
+        {
+            // Quadratic * Quadratic = Quartic (exact), but we want to fit it back to Quadratic
+            var x = new double[] { 0, 1, 2, 3, 4 };
+            var y1 = new double[] { 0, 1, 4, 9, 16 }; // f(x) = x^2
+            var y2 = new double[] { 1, 2, 5, 10, 17 }; // f(x) = x^2 + 1
+            
+            var curve1 = new Curve(x, y1, 2);
+            var curve2 = new Curve(x, y2, 2);
+            
+            // Exact product is degree 4
+            var exactProduct = curve1 * curve2;
+            Assert.That(exactProduct.PolynomialDegree, Is.EqualTo(4));
+            
+            // MultiplyAndFit should default to degree 2 (max of the two)
+            var fittedProduct = curve1.MultiplyAndFit(curve2);
+            Assert.That(fittedProduct.PolynomialDegree, Is.EqualTo(2));
+            
+            // Check a sample point
+            double testX = 2.0;
+            double expectedY = (testX * testX) * (testX * testX + 1); // 4 * 5 = 20
+            Assert.That(fittedProduct.EvaluateAt(testX).Y, Is.EqualTo(expectedY).Within(2)); // Reduced precision for fit
+        }
+
+        [Test]
+        public void TestMultiplyAndFit_ExactFit()
+        {
+            // Constant * Quadratic should fit perfectly into a Quadratic
+            var curve1 = new Curve(new double[] { 5 }, 0, 5); // f(x) = 5
+            var curve2 = new Curve(new double[] { 0, 0, 1 }, 0, 5); // f(x) = x^2
+            
+            var fitted = curve1.MultiplyAndFit(curve2);
+            Assert.That(fitted.PolynomialDegree, Is.EqualTo(2));
+            
+            // Should be exactly 5x^2
+            Assert.That(fitted.EvaluateAt(3).Y, Is.EqualTo(45).Within(1e-9));
+        }
+
+        [Test]
+        public void TestMultiplyAndFit_RealData()
+        {
+            double[] x = { 0.00, 41.57, 83.15, 124.72, 166.30, 207.87 };
+            double[] y1 = { 29.72, 29.56, 29.13, 28.01, 26.33, 22.79 };
+            double[] y2 = { 1, 0.999221391, 0.998690541, 0.998225156, 0.997797762, 0.997396565 };
+
+            var curve1 = new Curve(x, y1, 5);
+            var curve2 = new Curve(x, y2, 5);
+
+            Console.WriteLine($"Curve 1 Degree: {curve1.PolynomialDegree}");
+            Console.WriteLine($"Curve 2 Degree: {curve2.PolynomialDegree}");
+
+            var exactProduct = curve1 * curve2;
+            Console.WriteLine($"Exact Product Degree: {exactProduct.PolynomialDegree}");
+
+            var fittedProduct = curve1.MultiplyAndFit(curve2);
+            Console.WriteLine($"Fitted Product Degree: {fittedProduct.PolynomialDegree}");
+
+            Assert.That(fittedProduct.PolynomialDegree, Is.EqualTo(5));
+
+            // Verify some values
+            for (int i = 0; i < x.Length; i++)
+            {
+                double expectedProduct = y1[i] * y2[i];
+                double actualProduct = fittedProduct.EvaluateAt(x[i]).Y;
+                Console.WriteLine($"At x={x[i]:F2}: Expected={expectedProduct:F4}, Actual={actualProduct:F4}, Diff={Math.Abs(expectedProduct - actualProduct):F6}");
+                Assert.That(actualProduct, Is.EqualTo(expectedProduct).Within(0.1));
+            }
+        }
+
+        [Test]
         public void TestChainedOperations_Consistency()
         {
             var original = new Curve(new double[] { 1, 2, 3 }, -2, 2);

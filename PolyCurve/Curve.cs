@@ -1212,6 +1212,54 @@ namespace PolyCurve
             return InterpolateWithCoefficients(otherCurve, ratio);
         }
 
+        /// <summary>
+        /// Multiplies this curve with another curve and fits the result to a polynomial of a specified degree.
+        /// This allows multiplying curves without increasing the polynomial degree (as the exact * operator does).
+        /// Samples both curves in their overlapping domain and performs a least-squares fit.
+        /// </summary>
+        /// <param name="other">The curve to multiply with. Must not be null.</param>
+        /// <param name="targetDegree">The degree of the resulting polynomial. If null, uses the maximum degree of the two input curves.</param>
+        /// <param name="samplePoints">The number of points to sample for fitting. Defaults to 50.</param>
+        /// <returns>A new Curve representing the fitted product of the two curves within their overlapping domain.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when other is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when curves have no overlapping domain.</exception>
+        /// <example>
+        /// <code>
+        /// var productCurve = curve1.MultiplyAndFit(curve2); // Fits to max(degree1, degree2)
+        /// var cubicProduct = curve1.MultiplyAndFit(curve2, 3); // Forces cubic fit
+        /// </code>
+        /// </example>
+        public Curve MultiplyAndFit(Curve other, int? targetDegree = null, int samplePoints = 50)
+        {
+            if (other == null)
+                throw new ArgumentNullException(nameof(other));
+
+            // Find overlapping domain
+            double overlapMin = Math.Max(XMin, other.XMin);
+            double overlapMax = Math.Min(XMax, other.XMax);
+
+            if (overlapMin >= overlapMax)
+                throw new ArgumentException("Curves have no overlapping domain for multiplication fitting.");
+
+            var productPoints = new List<Point2D>();
+            double step = (overlapMax - overlapMin) / (samplePoints - 1);
+
+            for (int i = 0; i < samplePoints; i++)
+            {
+                double x = overlapMin + i * step;
+                double y = EvaluateAt(x).Y * other.EvaluateAt(x).Y;
+                productPoints.Add(new Point2D(x, y));
+            }
+
+            // Determine degree: default to max degree, but capped by points
+            int degree = Math.Min(
+                targetDegree ?? Math.Max(PolynomialDegree, other.PolynomialDegree),
+                samplePoints - 1
+            );
+
+            return new Curve(productPoints, degree, overlapMin, overlapMax);
+        }
+
         #endregion
 
         #region Statistical Analysis
@@ -1427,6 +1475,28 @@ namespace PolyCurve
                 throw new DivideByZeroException("Cannot divide curve by zero");
 
             return curve * (1 / scalar);
+        }
+
+        /// <summary>
+        /// Multiplies two curves together by multiplying their polynomials.
+        /// The resulting curve has a degree equal to the sum of the input curves' degrees.
+        /// The resulting curve's domain is the intersection of the input curves' domains.
+        /// </summary>
+        /// <param name="curve1">The first curve to multiply.</param>
+        /// <param name="curve2">The second curve to multiply.</param>
+        /// <returns>A new Curve representing the product of the two input curves.</returns>
+        /// <exception cref="ArgumentException">Thrown when the curves have no overlapping domain.</exception>
+        public static Curve operator *(Curve curve1, Curve curve2)
+        {
+            double newXMin = Math.Max(curve1.XMin, curve2.XMin);
+            double newXMax = Math.Min(curve1.XMax, curve2.XMax);
+
+            if (newXMin >= newXMax)
+                throw new ArgumentException("Curves have no overlapping domain for multiplication.");
+
+            double[] newCoeffs = MultiplyPolynomials(curve1.PolynomialCoeffs, curve2.PolynomialCoeffs);
+
+            return new Curve(newCoeffs, newXMin, newXMax);
         }
 
         /// <summary>
